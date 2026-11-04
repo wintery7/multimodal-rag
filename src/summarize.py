@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -21,6 +22,11 @@ IMAGE_PROMPT_KOR = """You are an assistant tasked with summarizing images for re
 These summaries will be embedded and used to retrieve the raw image.
 Provide a concise summary of the image that is well optimized for retrieval.
 Include the chart type, title, axis labels, legend items, key numbers and the overall trend.
+Match each bar/line color to its legend item carefully before reporting numbers.
+If the image is decorative (logo, cover, illustration), say so in one sentence.
+Charts are often cropped without their title, so start with one line "주제: ..." inferring
+what the chart measures from its legend and axes, and end with one line "검색 키워드: ..."
+listing 3-6 Korean keywords a user might search for (e.g. 앱 이용 비율, 보유율, 가입률, 이용시간).
 The summary should be written in Korean (Hangul)."""
 
 
@@ -76,15 +82,33 @@ def encode_image(image_path):
         return base64.b64encode(f.read()).decode("utf-8")
 
 
+CAPTION_HINT = """
+This image was cropped from a PDF page whose figure captions are listed below.
+The image is most likely one of these figures (or a decorative element). If it matches,
+use that caption as the chart title and use the caption's wording in the summary and keywords.
+Captions on this page:
+{captions}"""
+
+
+def _page_of(img_file):
+    """unstructured 파일명 규칙 figure-{페이지}-{순번}.jpg 에서 페이지 번호 추출"""
+    m = re.match(r"figure-(\d+)-\d+\.", img_file)
+    return int(m.group(1)) if m else None
+
+
 def image_summarize(img_base64, prompt=IMAGE_PROMPT_KOR):
-    """VLM(gpt-4o-mini)으로 이미지 요약 생성"""
+    """VLM으로 이미지 요약 생성"""
     chat = ChatOpenAI(model=VLM_MODEL, max_tokens=1024, temperature=0)
     msg = chat.invoke(
         [
             HumanMessage(
                 content=[
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}},
+                    {
+                        "type": "image_url",
+                        # detail=high: 그래프 속 작은 숫자·범례를 읽기 위해 고해상도로 전달
+                        "image_url": {"url": f"data:image/jpeg;base64,{img_base64}", "detail": "high"},
+                    },
                 ]
             )
         ]
@@ -92,10 +116,11 @@ def image_summarize(img_base64, prompt=IMAGE_PROMPT_KOR):
     return msg.content
 
 
-def generate_img_summaries(path, min_kb=8):
+def generate_img_summaries(path, min_kb=8, captions=None):
     """
     폴더 내 이미지 전체를 Base64로 인코딩하고 요약합니다.
     min_kb: 로고·아이콘 같은 작은 이미지는 검색 노이즈라 제외
+    captions: {페이지: [그림 제목, ...]} — 이미지가 있던 페이지의 그림 제목을 VLM에 힌트로 제공
     반환: (img_base64_list, image_summaries, img_files)
     """
     cache = _load_cache("image_summaries")
@@ -107,9 +132,13 @@ def generate_img_summaries(path, min_kb=8):
         if os.path.getsize(img_path) < min_kb * 1024:
             continue
         b64 = encode_image(img_path)
-        key = _h(b64)
+        prompt = IMAGE_PROMPT_KOR
+        page_caps = (captions or {}).get(_page_of(img_file))
+        if page_caps:
+            prompt += CAPTION_HINT.format(captions="\n".join(f"- {c}" for c in page_caps))
+        key = _h(VLM_MODEL + prompt + b64)  # 모델·프롬프트가 바뀌면 다시 요약
         if key not in cache:
-            cache[key] = image_summarize(b64)
+            cache[key] = image_summarize(b64, prompt)
             _save_cache("image_summaries", cache)
         img_base64_list.append(b64)
         image_summaries.append(cache[key])

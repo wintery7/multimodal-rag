@@ -9,16 +9,18 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_openai import ChatOpenAI
 
-from .config import LLM_MODEL
+from .config import ANSWER_MODEL, LLM_MODEL
 
 _B64_RE = re.compile(r"^[A-Za-z0-9+/]{100,}={0,2}$")
 
 INSTRUCTION = {
     "ko": "아래 자료(이미지·표·텍스트)를 근거로 질문에 한국어로 답하세요.\n"
           "그래프나 표에서 읽은 수치는 구체적으로 인용하세요.\n"
+          "자료에 명시되지 않은 수식어(예: '전망치', '예상치')나 해석은 덧붙이지 마세요.\n"
           "자료에 없는 내용은 모른다고 답하세요.",
     "en": "Answer the question in English based only on the materials below (images, tables, text).\n"
           "Quote specific numbers read from charts or tables.\n"
+          "Do not add qualifiers (e.g. 'forecast', 'estimate') that the materials do not state.\n"
           "If the answer is not in the materials, say you don't know.",
 }
 
@@ -39,7 +41,7 @@ def _make_prompt_func(lang):
     def img_prompt_func(data_dict):
         """검색된 원본을 멀티모달 LLM 입력 형태로 조립: 이미지 먼저, 그다음 텍스트+질문"""
         content = [
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}}
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}", "detail": "high"}}
             for img in data_dict["context"]["images"]
         ]
         formatted_texts = "\n\n---\n\n".join(data_dict["context"]["texts"])
@@ -57,7 +59,7 @@ def _make_prompt_func(lang):
 
 def build_multimodal_chain(retriever, lang="ko"):
     """Final Answer Pipeline: 검색 → 이미지/텍스트 분리 → 프롬프트 조립 → 멀티모달 LLM"""
-    model = ChatOpenAI(temperature=0, model=LLM_MODEL, max_tokens=1024)
+    model = ChatOpenAI(temperature=0, model=ANSWER_MODEL, max_tokens=1024)
     return (
         {
             "context": retriever | RunnableLambda(split_image_text_types),
@@ -71,7 +73,7 @@ def build_multimodal_chain(retriever, lang="ko"):
 
 def build_text_only_chain(text_retriever):
     """비교용 텍스트 전용 RAG 체인 (같은 모델·같은 지시문, 이미지 없음)"""
-    model = ChatOpenAI(temperature=0, model=LLM_MODEL, max_tokens=1024)
+    model = ChatOpenAI(temperature=0, model=ANSWER_MODEL, max_tokens=1024)
     return (
         {
             "context": text_retriever | RunnableLambda(split_image_text_types),

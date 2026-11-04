@@ -11,8 +11,9 @@ FIGURES_DIR = DATA_DIR / "figures"
 CACHE_DIR = DATA_DIR / "cache"
 
 # 모델 선택 (README '기술 선택 근거' 참고)
-LLM_MODEL = "gpt-4o-mini"        # 텍스트·표 요약 + 최종 답변 (비전 지원, 저렴)
-VLM_MODEL = "gpt-4o-mini"        # 이미지 요약
+LLM_MODEL = "gpt-4o-mini"        # 텍스트·표 요약, 번역 (텍스트 요약은 저렴한 모델로 충분)
+VLM_MODEL = "gpt-4.1"            # 이미지 요약 (4o-mini는 그래프 범례 색 매칭 오류가 잦아 교체)
+ANSWER_MODEL = "gpt-4.1"         # 최종 멀티모달 답변 (원본 그래프를 직접 읽어야 하므로)
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 # 윈도우에서 Path 등록 직후 에디터를 재시작하지 않으면 인식이 안 되는 문제를 방지

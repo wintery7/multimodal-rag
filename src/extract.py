@@ -1,4 +1,5 @@
 """① 문서 파싱: PDF → 텍스트 / 표 / 이미지 분리 (unstructured)."""
+import re
 from pathlib import Path
 
 from langchain_text_splitters import CharacterTextSplitter
@@ -28,6 +29,22 @@ def extract_pdf_elements(pdf_path, image_dir=FIGURES_DIR, languages=("eng",)):
         new_after_n_chars=3800,
         combine_text_under_n_chars=2000,
     )
+
+
+def figure_captions(pdf_path):
+    """
+    페이지별 그림 제목 목록을 반환합니다. {페이지번호: ["[그림4] 포항철강산단 1차금속 생산액", ...]}
+    hi_res가 잘라낸 그래프 이미지에는 제목이 빠져 있는 경우가 많아, VLM 요약 시 힌트로 사용합니다.
+    """
+    from pypdf import PdfReader
+
+    captions = {}
+    for page_no, page in enumerate(PdfReader(str(pdf_path)).pages, start=1):
+        text = page.extract_text() or ""
+        found = re.findall(r"\[그림\s*\d+\][^\[\n]*", text)
+        if found:
+            captions[page_no] = [re.sub(r"(\d\))+\s*$", "", c).strip() for c in found]
+    return captions
 
 
 def categorize_elements(raw_pdf_elements):
