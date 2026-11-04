@@ -1,0 +1,29 @@
+# 가상환경
+.venv/
+
+# 환경변수 (API 키 노출 방지)
+.env
+.env.*
+!.env.example
+
+# 추출 이미지 / 캐시 (용량 폭증 방지, 재생성 가능)
+data/figures/
+data/cache/
+*.pdf
+
+# OCR 언어팩 (setup 시 다운로드)
+.tessdata/
+
+# 벡터 DB
+chroma_db/
+
+# 파이썬
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# 에디터 / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

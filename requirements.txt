@@ -1,0 +1,20 @@
+langchain>=1.0
+langchain-classic>=1.0  # MultiVectorRetriever. langchain 1.x에서 분리됨 (필수)
+langchain-openai
+langchain-community
+langchain-chroma
+langchain-experimental
+langchain-ollama
+langchain-text-splitters
+unstructured[all-docs]
+unstructured-inference  # hi_res 레이아웃 모델 (all-docs에 빠져 있어 별도 명시)
+pillow
+pydantic
+lxml
+matplotlib
+chromadb
+tiktoken
+python-dotenv
+ipykernel
+jupyterlab
+nbconvert
